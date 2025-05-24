@@ -47,6 +47,7 @@ exports.getSearchedBooks = async (req, res, next) => {
     let search = req.query.search.trim ();
     const price = req.query.price;
     let limit = parseInt (req.query.limit);
+    console.log (dataFrom, search, price, limit);
 
     if (!dataFrom || !search) {
       return res.status (400).json ({message: 'Invalid Query!'});
@@ -67,15 +68,28 @@ exports.getSearchedBooks = async (req, res, next) => {
       books = await Book.find ({category: search})
         .sort ({discount_price: sortOrder})
         .limit (limit);
-      console.log (books);
     } else if (dataFrom === 'tags') {
       books = await Book.find ({tags: search})
         .sort ({discount_price: sortOrder})
         .limit (limit);
-    } else {
+    } else if(dataFrom==="searchbox"){
+      const regex = new RegExp (search, 'i'); 
+      books = await Book.find ({
+        $or: [
+          {title_bn: regex},
+          {title_en: regex},
+          {author_bn: regex},
+          {author_en: regex},
+        ],
+      })
+        .sort ({discount_price: sortOrder})
+        .limit (limit);
+    }
+    
+    
+    else {
       return res.status (400).json ({message: 'Invalid Query'});
     }
-
     return res.status (200).json ({
       message: 'Data fetched successfully.',
       data: books,
@@ -115,7 +129,32 @@ exports.getBookById = async (req, res, next) => {
     });
   }
 };
+//get related book
+exports.getRelatedBook=async (req,res,next)=>{
+  try{
+    const bookId=req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(bookId)) {
+      return res.status(400).json({
+        message: 'Invalid book id!',
+      });
+    }
+    const relatedBooks=await Book.find({
+      _id: {$ne: bookId}, 
+      category: {$in: (await Book.findById(bookId)).category}
+    }).limit(3); 
 
+    return res.status(200).json({
+      message: 'Related books fetched successfully!',
+      data: relatedBooks
+    });
+  }
+  catch(err){
+    console.log(err.message);
+    res.status(500).json({
+      message: 'Internal server error!'
+    });
+  }
+}
 //create book
 
 exports.createSingleBook = async (req, res, next) => {

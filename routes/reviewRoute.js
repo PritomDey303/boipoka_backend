@@ -5,5 +5,5 @@ const checkLogin = require ('../middlewares/checkLogin.js');
 
 router.post ('/add', checkLogin, addReview);
 
-router.get ('/:id', checkLogin, getReviews);
+router.get ('/:id', getReviews);
 module.exports = router;

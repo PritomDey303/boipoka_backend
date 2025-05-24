@@ -5,9 +5,9 @@ const {
   getSearchedBooks,
   getBookById,
   createSingleBook,
+  getRelatedBook,
 } = require ('../controllers/bookController');
 const checkLogin = require ('../middlewares/checkLogin');
-const upload = require ('../config/cloudinary');
 const handleImageUpload = require ('../config/cloudinary');
 const router = express.Router ();
 
@@ -18,8 +18,10 @@ router.post (
   handleImageUpload ('cover_image'),
   createSingleBook
 );
-router.get ('/:id', getBookById);
+router.get ('/book/:id', getBookById);
+router.get ('/related/:id', getRelatedBook);
 router.get ('/search', getSearchedBooks);
+
 router.post ('/allbooks', checkLogin, createBooks);
 
 module.exports = router;
