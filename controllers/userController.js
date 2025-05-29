@@ -6,9 +6,9 @@ const sendEmail = require ('../utils/sendEmail');
 exports.signup = async (req, res, next) => {
   try {
     const {name, email, mobile, password} = req.body;
-
     // Check if user already exists
     const existingUser = await User.find ({email});
+    console.log ('Existing User:', existingUser);
     if (existingUser.length > 0) {
       return res.status (400).json ({message: 'User already exists'});
     }
@@ -18,7 +18,7 @@ exports.signup = async (req, res, next) => {
       process.env.JWT_SECRET,
       {expiresIn: '1h'}
     );
-    const verificationUrl = `${process.env.BASE_URL}/api/user/verify/${token}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/verifyEmail?token=${token}`;
     const html = `<h1>Verify your email</h1>
                       <p>Click the link below to verify your email:</p>
                       <a href="${verificationUrl}">Verify Email</a>`;
@@ -39,6 +39,7 @@ exports.signup = async (req, res, next) => {
 exports.verifyEmail = async (req, res, next) => {
   try {
     const {token} = req.params;
+    console.log (req.params);
     const decoded = jwt.verify (token, process.env.JWT_SECRET);
     const {name, email, mobile, hashedPassword} = decoded;
 
@@ -59,7 +60,7 @@ exports.verifyEmail = async (req, res, next) => {
     await newUser.save ();
     res.status (200).json ({message: 'Email verified successfully'});
   } catch (err) {
-    console.error ('Error verifying email:', err);
+    console.error ('Error verifying email:', err.message);
     res
       .status (500)
       .json ({message: 'Failed to verify email', error: err.message});
@@ -91,40 +92,51 @@ exports.signin = async (req, res, next) => {
 
     // Generating access token
     const accessToken = jwt.sign (
-      {id: user._id, email: user.email},
+      {
+        _id: user._id,
+        email: user.email,
+        mobile: user.mobile,
+        userType: user.userType,
+      },
       process.env.JWT_SECRET,
       {expiresIn: '1h'}
     );
 
     // Generating refresh token
     const refreshToken = jwt.sign (
-      {id: user._id, email: user.email},
+      {
+        _id: user._id,
+        email: user.email,
+        mobile: user.mobile,
+        userType: user.userType,
+      },
       process.env.JWT_SECRET,
       {expiresIn: '7d'}
     );
 
     // Setting both tokens in cookies
 
+    const isProd = process.env.NODE_ENV === 'production';
+
     res.cookie ('accessToken', accessToken, {
       httpOnly: true,
-      secure: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 3600000,
-      sameSite: 'None',
       path: '/',
     });
 
     res.cookie ('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: true,
+      secure: isProd,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'None',
       path: '/',
     });
-
     res.status (200).json ({
       message: 'Signin successful',
       user: {
-        id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
         mobile: user.mobile,
@@ -132,6 +144,47 @@ exports.signin = async (req, res, next) => {
       },
     });
   } catch (error) {
-    next (error);
+    res.status (500).json ({
+      message: 'Internal server error',
+    });
+  }
+};
+
+//check user auth
+exports.checkUserAuth = async (req, res, next) => {
+  try {
+    if (req.user) {
+      res.status (200).json ({
+        message: 'User is authenticated',
+        user: {
+          _id: req.user.id,
+          name: req.user.name,
+          email: req.user.email,
+          mobile: req.user.mobile,
+          userType: req.user.userType,
+        },
+      });
+    } else {
+      res.status (401).json ({
+        message: 'User is not authenticated',
+      });
+    }
+  } catch (error) {
+    res.status (401).json ({
+      message: 'Unauthorized',
+    });
+  }
+};
+
+//signout
+exports.signout = async (req, res, next) => {
+  try {
+    res.clearCookie ('accessToken', {path: '/'});
+    res.clearCookie ('refreshToken', {path: '/'});
+    res.status (200).json ({message: 'Signout successful'});
+  } catch (error) {
+    res.status (500).json ({
+      message: 'Internal server error',
+    });
   }
 };

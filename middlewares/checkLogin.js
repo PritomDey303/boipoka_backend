@@ -1,4 +1,5 @@
 const jwt = require ('jsonwebtoken');
+
 const checkLogin = (req, res, next) => {
   try {
     const accessToken = req.cookies.accessToken;
@@ -7,7 +8,8 @@ const checkLogin = (req, res, next) => {
     if (!accessToken && !refreshToken) {
       return res.status (401).json ({message: 'Not authenticated'});
     }
-    //verifying access token
+
+    // Verify access token
     if (accessToken) {
       try {
         const user = jwt.verify (accessToken, process.env.JWT_SECRET);
@@ -21,22 +23,26 @@ const checkLogin = (req, res, next) => {
       }
     }
 
-    //generating access token from refresh token
     if (refreshToken) {
       try {
         const user = jwt.verify (refreshToken, process.env.JWT_SECRET);
 
-        // Generating new access token
         const newAccessToken = jwt.sign (
-          {id: user.id, email: user.email},
+          {
+            _id: user._id,
+            email: user.email,
+            mobile: user.mobile,
+            userType: user.userType,
+          },
           process.env.JWT_SECRET,
           {expiresIn: '1h'}
         );
 
+        const isProd = process.env.NODE_ENV === 'production';
         res.cookie ('accessToken', newAccessToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'None',
+          secure: isProd,
+          sameSite: isProd ? 'none' : 'lax',
           maxAge: 3600000,
           path: '/',
         });
@@ -45,16 +51,13 @@ const checkLogin = (req, res, next) => {
         return next ();
       } catch (err) {
         console.log (err.message);
-
         return res.status (401).json ({message: 'Invalid refresh token'});
       }
     }
 
-    //incase of not valid tokens
     return res.status (401).json ({message: 'Authentication required'});
   } catch (err) {
     console.log (err.message);
-
     return res.status (500).json ({message: 'Internal server error!'});
   }
 };
